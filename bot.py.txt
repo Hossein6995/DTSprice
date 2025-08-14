@@ -1,0 +1,48 @@
+import os
+import asyncio
+import aiohttp
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+BASE_URL = "https://api.binance.com/api/v3/ticker/price"
+
+user_favorites = {}
+
+async def get_price(symbol):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(BASE_URL, params={"symbol": symbol}) as resp:
+            data = await resp.json()
+            return data.get("price")
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("سلام! با دستور /live قیمت لحظه‌ای BTC و ETH رو ببین.\nبا /add ARZ ارز محبوبت رو اضافه کن.")
+
+async def live(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    default_coins = ["BTCUSDT", "ETHUSDT"]
+    favs = user_favorites.get(update.effective_user.id, [])
+    coins = default_coins + favs
+
+    msg = ""
+    for coin in coins:
+        price = await get_price(coin)
+        if price:
+            msg += f"{coin}: {float(price):,.2f} USD\n"
+
+    await update.message.reply_text(msg)
+
+async def add_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("لطفا نماد ارز رو وارد کن مثل: /add DOGEUSDT")
+        return
+
+    coin = context.args[0].upper()
+    user_favorites.setdefault(update.effective_user.id, []).append(coin)
+    await update.message.reply_text(f"✅ {coin} به لیستت اضافه شد.")
+
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("live", live))
+    app.add_handler(CommandHandler("add", add_coin))
+    app.run_polling()
