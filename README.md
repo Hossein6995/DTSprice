@@ -1,2 +1,4 @@
-# DTSprice
-price all coin
+python-telegram-bot
+aiohttp
+pytz
+
